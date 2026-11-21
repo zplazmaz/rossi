@@ -1,0 +1,47 @@
+# 覆盖 vcpkg 内置的 dav1d（runner 镜像 baseline 还停在 1.5.4）。
+# 1.5.4 的 include/compat/msvc/stdatomic.h 直接用 `#if defined(__clang__) && __has_include_next()`，
+# 而 MSVC 14.52（VS 2026）把未定义的函数式宏诊断成了 C7780/C1017（微软答复是 by design），
+# 于是 vcpkg 编不出 dav1d.pc。1.5.5 已加 `#ifndef __has_include_next / #define __has_include_next(x) 0`
+# 的兜底，这里用 overlay port 把版本顶上去，避免在 action 里对源码打补丁。
+vcpkg_from_github(
+    OUT_SOURCE_PATH SOURCE_PATH
+    REPO videolan/dav1d
+    REF 1.5.5
+    SHA512 1bd117c17b6cb0a40278d87c068e76bffef80baa196662b08711b9fa4b10b8ac37fecb2ba00c77cfac9c3d1d94eb3e942663f7bf0fa3e4168723e4d08d937152
+    HEAD_REF master
+)
+
+if (VCPKG_TARGET_ARCHITECTURE STREQUAL "x86" OR VCPKG_TARGET_ARCHITECTURE STREQUAL "x64")
+    vcpkg_find_acquire_program(NASM)
+    get_filename_component(NASM_EXE_PATH ${NASM} DIRECTORY)
+    vcpkg_add_to_path(${NASM_EXE_PATH})
+elseif (VCPKG_TARGET_IS_WINDOWS)
+    vcpkg_find_acquire_program(GASPREPROCESSOR)
+    foreach(GAS_PATH ${GASPREPROCESSOR})
+        get_filename_component(GAS_ITEM_PATH ${GAS_PATH} DIRECTORY)
+        vcpkg_add_to_path(${GAS_ITEM_PATH})
+    endforeach(GAS_PATH)
+endif()
+
+set(LIBRARY_TYPE ${VCPKG_LIBRARY_LINKAGE})
+if (LIBRARY_TYPE STREQUAL "dynamic")
+    set(LIBRARY_TYPE "shared")
+endif(LIBRARY_TYPE STREQUAL "dynamic")
+
+vcpkg_configure_meson(
+    SOURCE_PATH "${SOURCE_PATH}"
+    OPTIONS
+        --default-library=${LIBRARY_TYPE}
+        -Denable_tests=false
+        -Denable_tools=false
+)
+
+vcpkg_install_meson()
+vcpkg_copy_pdbs()
+vcpkg_fixup_pkgconfig()
+file(INSTALL "${CMAKE_CURRENT_LIST_DIR}/usage" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}")
+vcpkg_install_copyright(
+    FILE_LIST
+        "${SOURCE_PATH}/COPYING"
+        "${SOURCE_PATH}/src/ext/x86/x86inc.asm"
+)

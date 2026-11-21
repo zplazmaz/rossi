@@ -19,7 +19,11 @@ runs:
         # 只报一句 "Building native assets failed"。路径一律现查，不写死。
         $vcpkg = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } else { $env:VCPKG_INSTALLATION_ROOT }
         if (-not $vcpkg) { "::error::runner 上没有 VCPKG_ROOT / VCPKG_INSTALLATION_ROOT"; exit 1 }
-        & (Join-Path $vcpkg 'vcpkg.exe') install dav1d:x64-windows pkgconf:x64-windows
+        # runner 内置 baseline 的 dav1d 还是 1.5.4，编不过 MSVC 14.52（见 dav1d-overlay 里的说明），
+        # 用 overlay port 顶到 1.5.5。只在 dav1d 这一项上覆盖，其余依赖仍走内置 ports。
+        $overlayPorts = Join-Path $env:GITHUB_ACTION_PATH 'dav1d-overlay'
+        "::notice::vcpkg overlay-ports=$overlayPorts"
+        & (Join-Path $vcpkg 'vcpkg.exe') install dav1d:x64-windows pkgconf:x64-windows --overlay-ports="$overlayPorts"
         # dav1d-sys 0.8.3 的 build.rs 不是「链接现成 dav1d」，而是解包 dav1d 源码自己编
         # （失败时日志里能看到 dav1d-1.5.4.tar.gz），x86 汇编要 nasm、配置要 meson+ninja，
         # GitHub 的 Windows 镜像这三样都没有 ⇒ 只补 pkg-config 仍然编不过。
