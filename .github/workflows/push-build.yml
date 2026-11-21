@@ -29,8 +29,12 @@ jobs:
         id: check
         env:
           INFISICAL_IDENTITY_ID: ${{ vars.INFISICAL_IDENTITY_ID }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ -z "$INFISICAL_IDENTITY_ID" ]; then
+          # 未配 vars 时：push / workflow_dispatch 仍按 workflow 里的公开默认身份构建，
+          # 这样 fork 出来的新仓库零配置也能出 Android 包；pull_request（含 fork）无 vars
+          # 一律跳过 Android，避免不受信任代码触达签名密钥。
+          if [ -z "$INFISICAL_IDENTITY_ID" ] && [ "$EVENT_NAME" = "pull_request" ]; then
             echo "has_key=false" >> "$GITHUB_OUTPUT"
           else
             echo "has_key=true" >> "$GITHUB_OUTPUT"
@@ -44,7 +48,7 @@ jobs:
     steps:
       - name: 提示跳过 Android 构建
         run: |
-          echo "跳过 Android 构建：GitHub Variables 里缺 INFISICAL_IDENTITY_ID（Fork PR 无此变量），其他平台正常构建。"
+          echo "跳过 Android 构建：PR 事件且无 INFISICAL_IDENTITY_ID（不受信任代码不触达签名密钥），其他平台正常构建。"
 
   # ══════════════════════════════════════════
   # 1. Android 构建
@@ -91,8 +95,9 @@ jobs:
         uses: Infisical/secrets-action@v1.0.9
         with:
           method: "oidc"
-          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
-          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
+          # 公开标识符给默认值：仓库配了 vars 以 vars 为准，新仓库零配置也可构建。
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID || 'eecb0a28-d6c3-4daf-b135-ec38f6f30bd1' }}
+          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG || 'breeze-android-signing' }}
           env-slug: ${{ vars.INFISICAL_ENV_SLUG || 'prod' }}
           domain: "https://app.infisical.com"
 

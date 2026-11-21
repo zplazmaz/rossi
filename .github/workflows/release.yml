@@ -185,8 +185,11 @@ jobs:
         uses: Infisical/secrets-action@v1.0.9
         with:
           method: "oidc"
-          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
-          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
+          # identity-id / project-slug 都是公开标识符（Infisical 侧用白名单 subject 兜底），
+          # 因此这里给默认值：仓库配了 vars 时以 vars 为准，没配的新仓库（如 fork 小号）
+          # 也能零配置取到签名材料，不必逐个仓库去 Settings 里补 Variables。
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID || 'eecb0a28-d6c3-4daf-b135-ec38f6f30bd1' }}
+          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG || 'breeze-android-signing' }}
           env-slug: ${{ vars.INFISICAL_ENV_SLUG || 'prod' }}
           domain: "https://app.infisical.com"
 
