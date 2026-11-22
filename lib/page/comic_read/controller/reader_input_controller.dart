@@ -723,7 +723,8 @@ class ReaderInputController {
     final invert = OperationBindingStore.wheelDirectionFollowsHand(
       context.read<GlobalSettingCubit>().state.operationBindingSetting,
     );
-    final currentDirection = (invert ? -rawDy : rawDy) < 0 ? 'up' : 'down';
+    // 方向词只由 bindingWheelDirection 判定，不在外层再写一遍 invert/符号比较。
+    final currentDirection = bindingWheelDirection(rawDy, invert: invert);
     final now = DateTime.now();
 
     // 手势间隔超时：超过 300ms 无滚轮事件，清空旧累加器残余
@@ -775,11 +776,16 @@ class ReaderInputController {
           transformationController.value = before;
         });
         _lastWheelActionTime = now;
-        _lastWheelActionDirection = currentDirection;
-        final dy = invert ? -effectiveDy : effectiveDy;
-        if (dy > 0) {
+        // 真正翻页用的是累加后的 effectiveDy，方向词与动作必须从同一个 dy 判定，
+        // 否则事件方向（currentDirection）与累加方向相反时会把冷却状态记成反向。
+        final effectiveDirection = bindingWheelDirection(
+          effectiveDy,
+          invert: invert,
+        );
+        _lastWheelActionDirection = effectiveDirection;
+        if (effectiveDirection == 'down') {
           actionController.onPageActionNext();
-        } else if (dy < 0) {
+        } else {
           actionController.onPageActionPrev();
         }
         return;

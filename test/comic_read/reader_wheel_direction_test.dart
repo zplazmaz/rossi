@@ -228,6 +228,50 @@ void main() {
     }
   });
 
+  /// 触控板与鼠标走的是两条采集口（PointerPanZoomUpdate vs PointerScroll），
+  /// 但方向词必须同一份判定。macOS 按手算时，Mac 触控板「两指上推 = 向下滚 =
+  /// 下一页」给的是 panDelta.dy < 0，必须命中出厂那行「下滚 = 下一页」。
+  /// 这条钉死生产默认（invertWheelDirection=null 在 macOS 解析为 true）下的触控板方向，
+  /// 防止累加阈值那轮改动把触控板方向翻过来。
+  testWidgets('触控板按手算时，物理下滚（两指上推）仍是下一页', (tester) async {
+    for (final readMode in [kReadModeRowLtr, kReadModeRowRtl]) {
+      final reader = await _mount(
+        tester,
+        readMode: readMode,
+        noAnimation: true,
+        bindingsDocJson: factory(),
+        invertWheel: true,
+      );
+      expect(reader.slot, 3);
+
+      await tester.sendEventToBinding(
+        const PointerPanZoomStartEvent(position: Offset(300, 300)),
+      );
+      await tester.sendEventToBinding(
+        const PointerPanZoomUpdateEvent(
+          position: Offset(300, 300),
+          panDelta: Offset(0, -40),
+        ),
+      );
+      await tester.sendEventToBinding(const PointerPanZoomEndEvent());
+      await tester.pumpAndSettle();
+      expect(reader.slot, 4, reason: '触控板物理下滚必须前进一页');
+
+      await tester.sendEventToBinding(
+        const PointerPanZoomStartEvent(position: Offset(300, 300)),
+      );
+      await tester.sendEventToBinding(
+        const PointerPanZoomUpdateEvent(
+          position: Offset(300, 300),
+          panDelta: Offset(0, 40),
+        ),
+      );
+      await tester.sendEventToBinding(const PointerPanZoomEndEvent());
+      await tester.pumpAndSettle();
+      expect(reader.slot, 3, reason: '触控板物理上滚必须退回一页');
+    }
+  });
+
   /// 采集端那一份判定必须**三处共用**：绑定表关掉时走的是旧硬编码滚轮，
   /// 它若不吃同一个开关，同一个手势会在「开/关绑定表」下走出两种方向。
   testWidgets('绑定表没启用时，旧硬编码滚轮吃同一个判定', (tester) async {

@@ -415,6 +415,15 @@ category。每个动作带语义图标，最多展示两枚紧凑输入标签，
 `test/comic_read/reader_wheel_direction_test.dart` 再把方向这一维钉住：PageView 按
 `isReverseRowReadMode` 反转（左开时下一页真的在左边），出厂滚轮行在右开 / 左开、
 有无动画四种组合下都必须是「下滚前进、上滚退回」，而旧口径的空间行仍随方向翻转。
+触控板那条另有一条按手算的用例，因为 `PointerPanZoomUpdate` 与 `PointerScroll` 是两条
+采集口，累加阈值那轮改动后最容易把触控板方向翻过来。
+
+**dy → 方向词只有 `bindingWheelDirection`（`lib/util/input/binding_input_capture.dart`）
+一处**：`bindingWheelInput`、运行时分发、录入器、绑定表停用时的旧硬编码滚轮全部走它。
+`wheelDirectionFollowsHand` 只决定「要不要取反」，`bindingWheelDirection` 才真正把 dy 翻成
+`up`/`down` —— 两层职责分开，外层不得再写第二遍 `invert ? -dy : dy < 0 ? 'up' : 'down'`。
+`test/operation_binding/wheel_direction_source_test.dart` 会扫描 `lib/` 与 `test/` 下所有
+手写 Dart 源码，一旦别处再出现 `? 'up' : 'down'` 判定就红，把「改一处漏一处」这类回归堵死。
 
 平台边界：手柄可编辑按钮编号、导入导出，但当前 Flutter 外壳尚无手柄事件接入，
 表单会直接说明。动作是否已有执行体仍以核心注册表的 `implemented` 为准。
